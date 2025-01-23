@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protein Structure Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://3dmol.org/build/3Dmol-min.js"></script>
+    <style>
+        body {
+            background-color: #1e1e2f;
+            color: #f5f5f5;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .input-section, .results-section {
+            background-color: #282a36;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .viewer-section {
+            flex: 1;
+            background-color: #282a36;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .viewer {
+            width: 100%;
+            height: 600px;
+            position: relative;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #44475a;
+            color: #f8f8f2;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #6272a4;
+            color: #f5f5f5;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #50fa7b;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+        .status-log {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #44475a;
+            padding: 10px;
+            background-color: #282a36;
+            color: #f8f8f2;
+            border-radius: 5px;
+        }
+        .confidence-scores {
+            margin-top: 20px;
+        }
+        .loader {
+            border: 5px solid #44475a;
+            border-radius: 50%;
+            border-top: 5px solid #50fa7b;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .plddt-legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(40, 42, 54, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #44475a;
+            z-index: 1000;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="input-section">
+                <h1>Protein Structure Prediction</h1>
+                <form id="prediction-form">
+                    <label for="sequence">Protein Sequence:</label>
+                    <textarea id="sequence" name="sequence" required></textarea>
+                    <button type="submit">Predict Structure</button>
+                </form>
+                
+                <div class="loading">
+                    <div class="loader"></div>
+                    <p>Predicting structure... This may take several minutes.</p>
+                    <div class="status-log"></div>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <div class="confidence-scores"></div>
+            </div>
+        </div>
+        
+        <div class="viewer-section">
+            <div id="viewer" class="viewer"></div>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#prediction-form').submit(function(e) {
+                e.preventDefault();
+                
+                $('.loading').show();
+                $('#viewer').empty();
+                $('.confidence-scores').empty();
+                $('.status-log').empty();
+                
+                $.ajax({
+                    url: '/predict',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        sequence: $('#sequence').val()
+                    }),
+                    success: function(response) {
+                        $('.loading').hide();
+                        $('#viewer').html(response.html);
+                        
+                        // Display confidence scores
+                        let scoresHtml = '<h2>Confidence Scores</h2>';
+                        for (let [key, value] of Object.entries(response.confidence_scores)) {
+                            if (typeof value === 'object') continue;
+                            scoresHtml += `<p><strong>${key}:</strong> ${typeof value === 'number' ? value.toFixed(4) : value}</p>`;
+                        }
+                        $('.confidence-scores').html(scoresHtml);
+                        
+                        // Display status messages
+                        if (response.status_messages && response.status_messages.length > 0) {
+                            let logHtml = '<h3>Prediction Log</h3>';
+                            response.status_messages.forEach(message => {
+                                logHtml += `<div>${message}</div>`;
+                            });
+                            $('.status-log').html(logHtml);
+                        }
+                    },
+                    error: function(error) {
+                        $('.loading').hide();
+                        alert('Error predicting structure: ' + error.responseJSON.detail);
+                        $('.status-log').html(`<div style="color: #ff5555;">Error: ${error.responseJSON.detail}</div>`);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
