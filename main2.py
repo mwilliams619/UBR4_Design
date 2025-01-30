@@ -19,7 +19,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 torch.set_float32_matmul_precision('medium')
 # Configure PyTorch Lightning logger
 pl.seed_everything(42)
-logger = TensorBoardLogger("lightning_logs", name="boltz_prediction")
+logger = TensorBoardLogger("lightning_logs", name="chai_prediction")
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -38,31 +38,20 @@ async def predict_structure(protein: ProteinSequence):
         # Create timestamped directory for this prediction
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = os.path.join(BASE_OUTPUT_DIR, f"prediction_{timestamp}")
-        os.makedirs(output_dir, exist_ok=True)
         
-        print(f"Created output directory: {output_dir}")
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_fasta:
+            temp_fasta.write(f">protein|user_input_sequence\n{protein.sequence}")
+            input_path = temp_fasta.name
         
-        # Create input FASTA file
-        input_file = "input.fasta"
-        input_path = os.path.join(output_dir, input_file)
-        with open(input_path, "w") as f:
-            f.write(f">A|protein|empty\n{protein.sequence}")
+        print(f"Created temporary input file at: {input_path}")
         
-        print(f"Created input file at: {input_path}")
-        
-        # Run Boltz prediction
+        # Run Chai prediction
         cmd = [
-            "boltz", "predict", input_path,
-            "--out_dir", output_dir,
-            "--use_msa_server",
-            "--output_format", "pdb",  
-            "--recycling_steps", "10",
-            "--sampling_steps", "400",
-            "--diffusion_samples", "25",
-            "--step_scale", "1.2" ,
-            "--write_full_pae",
-            "--write_full_pde",
-
+            "chai", "fold",
+            "--use-msa-server",
+            input_path,
+            output_dir,
+            
         ]
         
         print(f"Running command: {' '.join(cmd)}")
@@ -92,7 +81,7 @@ async def predict_structure(protein: ProteinSequence):
             raise Exception(f"Prediction failed with return code {rc}\n" + "\n".join(status_messages))
 
         # Updated path structure based on the actual output
-        results_dir = os.path.join(output_dir, "boltz_results_input", "predictions", "input")
+        results_dir = os.path.join(output_dir, "chai_results_input", "predictions", "input")
         if not os.path.exists(results_dir):
             raise Exception(f"Results directory not found at {results_dir}")
             

@@ -1,3 +1,7 @@
 *.fasta
 venv/*
 protein_predictions/*
+chai_venv/*
+output_directory/*
+bioprotac.ipynb
+...protein_predictions/*
